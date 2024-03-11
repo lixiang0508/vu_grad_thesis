@@ -1,44 +1,92 @@
-import sys
+import heapq
 import random
 
 import Obstacle
+import copy
+import utils
 from Obstacle import Obstacle
-from scipy.spatial import Delaunay
-
-'''
-class Chromosome:
-    cost = sys.maxsize
-    edges = []
-
-    def __init__(self, steinerpts, bins):
-        self.steinerpts = steinerpts
-        self.bins = bins # k , the length of list of obstacle corners is k
-'''
 
 import sys
 import numpy as np
-import itertools
-from scipy.spatial import distance_matrix
-from scipy.sparse.csgraph import minimum_spanning_tree
-import matplotlib.path as mpath
 
 
 class Chromosome:
-    def __init__(self, steinerpts, bins, terminals , obstacles):
+    def __init__(self, steinerpts, bins, terminals, obstacles):
         self.steinerpts = steinerpts  # List of tuples for Steiner points (x, y)
         self.bins = bins  # Binary string indicating obstacle corner inclusion
-        self.cost = sys.maxsize  # Initially set to maximum value
+        # self.cost = sys.maxsize  # Initially set to maximum value
         self.terminals = terminals
         self.obstacles = obstacles
-        dist_matrix = distance_matrix(steinerpts + terminals, steinerpts + terminals) # to be updated
-        mst = minimum_spanning_tree(dist_matrix).toarray()
+        self.nodes = self.get_nodes()  # possible nodes to generate a MST ( all steiner pts, all terminals, obstacles
+        # with char 1)
+        self.mst, self.cost = self.cal_mst()
+        # dist_matrix = distance_matrix(steinerpts + terminals, steinerpts + terminals) #todo to be updated
+        # mst = minimum_spanning_tree(dist_matrix).toarray()
 
         # Update the edges based on MST calculation
-        self.edges = np.argwhere(mst > 0)  # List to store edges of the MST
+        # self.edges = np.argwhere(self.mst > 0)  # List to store edges of the MST
+
+    def get_nodes(self):  # possible nodes to generate a MST ( all steiner pts, all terminals, obstacles with char 1)
+        nodes = []
+        nodes.extend(self.steinerpts)
+        nodes.extend(self.terminals)
+        obstacle_corners = self.get_obstacle_corners()
+        for i in range(len(self.bins)):
+            if self.bins[i] == '1':
+                nodes.append(obstacle_corners[i])
+        return nodes
+
+    def cal_mst(self):
+        # possible nodes to generate a MST ( all steiner pts, all terminals, obstacles with char 1)
+        nodes = self.get_nodes()
+        return self.prim(nodes)
+
+    def cal_edge_weight(self, point1, point2):
+        org_len = utils.cal_dis(point1, point2)
+        cross_len = 0
+        weight = 0
+        for i in range(len(self.obstacles)):
+            cur_len = utils.segment_in_obstacle_length(self.obstacles[i].points, [point1, point2])
+            cross_len += cur_len
+            weight += cur_len * self.obstacles[i].weight
+        return weight + (org_len - cross_len)
+
+    def prim(self, nodes):  # used to generate the MST
+        num_nodes = len(nodes)
+        visited = [False] * num_nodes
+        #  Choose the first node as starting node
+        visited[0] = True
+        # PriorityQueue used to choose the next edge with minimum weight
+        edges = [(self.cal_edge_weight(nodes[0], nodes[i]), 0, i) for i in range(1, num_nodes)]
+        heapq.heapify(edges)
+
+        mst = []  # store the edges of MST
+        total_weight = 0
+
+        while edges:
+            weight, u, v = heapq.heappop(edges)
+            if not visited[v]:
+                visited[v] = True
+                mst.append((u, v))
+                total_weight += weight
+
+                for next_v in range(num_nodes):
+                    if not visited[next_v]:
+                        next_weight = self.cal_edge_weight(nodes[v], nodes[next_v])
+                        heapq.heappush(edges, (next_weight, v, next_v))
+
+        return mst, total_weight
+
+    def get_obstacle_corners(self):
+        obstacle_corners = []
+        for obstacle in self.obstacles:
+            obstacle_corners.extend(obstacle.points)
+        return obstacle_corners
 
     def flipMove(self, dis, nogen):
+        # nogen number of generations is from external call
         # dis stands for average Euclidean distance between terminals
-        spts = self.steinerpts
+        spts = copy.deepcopy(self.steinerpts)
         bins = self.bins
         mrange = max(1 - nogen / 100, 0.01) * dis
         xmove = np.random.uniform(0, mrange)
@@ -56,23 +104,30 @@ class Chromosome:
                     flagx = 0
                 if loc[1] + ymove > 1:
                     flagy = 0
-                spts[i][0] += xmove * flagx
-                spts[i][1] += ymove * flagy
+                spts[i] = (spts[i][0] + xmove * flagx, spts[i][1] + ymove * flagy)
+                # spts[i][0] += xmove * flagx
+                # spts[i][1] += ymove * flagy
         # self.steinerpts = spts
+        new_bins = ''
         for i in range(k):
             if probs[i + s] == 1:
-                if bins[i] == 0:
-                    bins[i] = 1
+                if bins[i] == '0':
+                    new_bins += '1'
                 else:
-                    bins[i] = 0
+                    new_bins += '0'
+            else:
+                new_bins += bins[i]
         # self.bins = bins
-        ret_chromosome = Chromosome(spts, bins, self.terminals, self.obstacles)
+        ret_chromosome = copy.deepcopy(self)
+        ret_chromosome.steinerpts = spts
+        ret_chromosome.bins = new_bins
+        # ret_chromosome = Chromosome(spts, bins, self.terminals, self.obstacles)
         # ret_chromosome.edges = self.edges
         # ret_chromosome.cost = self.cost
         return ret_chromosome
 
-    def calculate_mst(self):
-        """Calculates the Weighted Minimum Spanning Tree for the chromosome."""
+    """def calculate_mst(self):
+        #Calculates the Weighted Minimum Spanning Tree for the chromosome.
         ret_chromosome = Chromosome(self.steinerpts, self.bins, self.terminals, self.obstacles)
 
         ret_chromosome.steinerpts = self.steinerpts
@@ -85,16 +140,23 @@ class Chromosome:
         ret_chromosome.edges = self.edges
         ret_chromosome.cost = self.cost
         return ret_chromosome
+    """
 
-    def add_steiner_mutation(self, hard_obstacles):
+    def add_steiner_mutation(self):
+        hard_obstacles = [ob.points for ob in self.obstacles if
+                          ob.weight == sys.maxsize]  # hard_obstacles is a list of list (each list contains some
+        # coordinates)
         """Performs the addSteiner mutation on the chromosome."""
-        new_chro = self.calculate_mst()
+        # new_chro = Chromosome(self.steinerpts, self.bins, self.terminals, self.obstacles)
+        new_chro = copy.deepcopy(self)
+
+        unique_node_mst = {element for tup in self.mst for element in tup}
 
         # Find nodes with angles less than 2*pi/3
         small_angle_nodes = []  # List to store nodes with small angles
-        for edge in self.edges:
+        for edge in self.mst:
             node, neighbor = edge
-            for other_neighbor in (set(range(len(self.steinerpts))) - {neighbor}):
+            for other_neighbor in (unique_node_mst - {neighbor}):
                 angle = self.calculate_angle(node, neighbor, other_neighbor)
                 if angle < 2 * np.pi / 3:
                     small_angle_nodes.append((node, neighbor, other_neighbor))
@@ -110,30 +172,35 @@ class Chromosome:
             new_chro.steinerpts.append(random_point)
         return new_chro
 
-    def removeSteiner(self):
-        degrees = {node: 0 for node in range(self.steinerpts + self.terminals)}
-        for edge in self.edges:
-            degrees[edge[0]] += 1
-            degrees[edge[1]] += 1
+    def remove_steiner_mutation(self):
+        ret_chromosome = copy.deepcopy(self)
+        degrees = {node: 0 for node in range(len(self.steinerpts))}
+        for edge in self.mst:
+            if self.nodes[edge[0]] in self.steinerpts:
+                degrees[edge[0]] += 1
+            if self.nodes[edge[1]] in self.steinerpts:
+                degrees[edge[1]] += 1
+
         degree_2_pts = [pt for pt, degree in degrees.items() if degree == 2]
 
         # If there are no Steiner points with degree 2, return without doing anything
         if not degree_2_pts:
-            return
+            return ret_chromosome
 
         idx = random.choice(degree_2_pts)
         while idx >= len(self.steinerpts):
             idx = random.choice(degree_2_pts)
 
         pt_to_remove = self.steinerpts[idx]  # random would generate  an index of steiner points
-        return Chromosome([pt for pt in self.steinerpts if pt != pt_to_remove], self.bins, self.terminals, self.obstacles)
+        return Chromosome([pt for pt in self.steinerpts if pt != pt_to_remove], self.bins, self.terminals,
+                          self.obstacles)
 
     def calculate_angle(self, node, neighbor1, neighbor2):
         """Calculates the angle between three points."""
         # Fetch point coordinates
-        p1 = np.array(self.steinerpts)[node]
-        p2 = np.array(self.steinerpts)[neighbor1]
-        p3 = np.array(self.steinerpts)[neighbor2]
+        p1 = np.array(self.nodes)[node]
+        p2 = np.array(self.nodes)[neighbor1]
+        p3 = np.array(self.nodes)[neighbor2]
 
         # Calculate vectors
         v1 = p2 - p1
@@ -146,7 +213,7 @@ class Chromosome:
     def calculate_steiner_point(self, nodes):
         """Calculates the position of a new Steiner point."""
         # Here, we're just calculating the centroid of the triangle formed by the nodes.
-        points = [np.array(self.steinerpts)[node] for node in nodes]
+        points = [np.array(self.nodes)[node] for node in nodes]
         centroid = np.mean(points, axis=0)
         return tuple(centroid)
 
@@ -154,34 +221,19 @@ class Chromosome:
         """Generates a random Steiner point avoiding placement inside  solid obstacles."""
         # Placeholder for random point generation. You need to implement obstacle avoidance.
         cur = np.random.random(), np.random.random()
-        while self.check_inside(hard_obstacles, cur):
+        while utils.check_inside(hard_obstacles, cur):
             cur = np.random.random(), np.random.random()
 
         return cur
-
-    def check_inside(self, vertices, point):
-        for i in range(len(vertices)):
-            # Define the vertices of the polygon
-            # vertices = np.array([[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]])
-            polygon = mpath.Path(np.array(vertices[i]))
-
-            # Point to be tested
-            # point = np.array([0.5, 0.5])
-
-            # Check if the point is inside the polygon
-            inside = polygon.contains_point(np.array(point))
-            if inside == True:
-                return True
-        # print('Point inside polygon:', inside)
-        return False
 
 
 # Example usage
 terminals = [(0.1, 0.1), (0.9, 0.9)]  # List of terminals (x, y)
 initial_steiner_points = [(0.5, 0.5)]  # Initial list of Steiner points
 bins = "110"  # Example binary string for obstacle corner inclusion
-obstacles = [Obstacle(1.1, 'soft',[(0.1, 0.1), (0.9, 0.9), (0.3,0.4)]) , Obstacle(1.1, 'soft',[(0.7, 0.1), (0.9, 0.9),(0.5,0.6)]) ]
+obstacles = [Obstacle(1.1, 'soft', [(0.1, 0.1), (0.9, 0.9), (0.3, 0.4)]),
+             Obstacle(1.1, 'soft', [(0.7, 0.1), (0.9, 0.9), (0.5, 0.6)])]
 
 chromosome = Chromosome(initial_steiner_points, bins, terminals, obstacles)
-chromosome.add_steiner_mutation([[(0.1, 0.1), (0.9, 0.9)]])
+chromosome.add_steiner_mutation()
 print("Steiner Points:", chromosome.steinerpts)

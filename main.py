@@ -1,6 +1,7 @@
 # This is a sample Python script.
 import sys
 import random
+import utils
 
 import numpy as np
 
@@ -13,13 +14,15 @@ def check_inside(vertices, point):
     for i in range(len(vertices)):
         # Define the vertices of the polygon
         #vertices = np.array([[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]])
-        polygon = mpath.Path(np.array(vertices[i]))
+        #polygon = mpath.Path(np.array(vertices[i]))
+        polygon = mpath.Path(vertices[i] + [vertices[i][0]]) #todo made some changes
 
         # Point to be tested
         #point = np.array([0.5, 0.5])
 
         # Check if the point is inside the polygon
-        inside = polygon.contains_point(np.array(point))
+        #inside = polygon.contains_point(np.array(point))
+        inside = polygon.contains_point(point)
         if inside==True:
             return True
     #print('Point inside polygon:', inside)
@@ -70,11 +73,8 @@ def process_obstacle_file(file_path):
     return obstacles
 
 
-def cal_dis(x, y):
-    return np.sqrt((x[0] - y[0]) * (x[0] - y[0]) + (x[1] - y[1]) * (x[1] - y[1]))
-
 def crossover(chromosome1, chromosome2, terminals, corners):
-    terminal_x = [x[0] for x in terminals]
+    terminal_x = [x[0] for x in terminals] #todo mention
     split = random.uniform(min(terminal_x), max(terminal_x))
     c1_stpts_l = []
     c1_stpts_r = []
@@ -110,10 +110,8 @@ def crossover(chromosome1, chromosome2, terminals, corners):
     child1_bins = c1_corners_l + c2_corners_r
     child2_bins = c2_corners_l + c1_corners_r
 
-    return [Chromosome(child1_stps, child1_bins, terminals) , Chromosome(child2_stps,child2_bins, terminals)]
+    return [Chromosome(child1_stps, child1_bins, terminals, chromosome1.obstacles) , Chromosome(child2_stps,child2_bins, terminals, chromosome1.obstacles)]
 
-def cal_cost(chromosome, obstacles):
-    pass
 
 def initial_tournament(chromosomes):
     pass
@@ -165,7 +163,7 @@ if __name__ == '__main__':
     dis = []
     for i in range(n):
         for j in range(i + 1, n):
-            dis.append(cal_dis(terminals[i], terminals[j]))
+            dis.append(utils.cal_dis(terminals[i], terminals[j]))
     print(' average distance is', sum(dis) / len(dis))
 
     '''
@@ -176,6 +174,7 @@ if __name__ == '__main__':
     k = sum(len(o['coordinates']) for o in obstacles)
 
     # initialization 1 Delaunay triangulation
+    ''' initialization 1 Delaunay triangulation '''
     term_corners =[]
     corners=[]
     for o in obstacles:
@@ -186,18 +185,21 @@ if __name__ == '__main__':
     tri = Delaunay(term_corners)
     # Find centroids
     centroids = [np_term_corners[triangle].mean(axis=0) for triangle in tri.simplices]
+    centroids = [cent for cent in centroids if not check_inside(hard_corners,cent)]
+    '''
     for cent in centroids:
         if check_inside(hard_corners,cent):
             centroids.remove(cent)
+    '''
 
 
     # Print centroids
     print('initialization 1 centroids' , np.array(centroids))
-    chromosomes.append(Chromosome(centroids, ''.join(str(0) for _ in range(k)), terminals))
+    chromosomes.append(Chromosome(centroids, ''.join(str(0) for _ in range(k)), terminals, all_obstacles))
     #print(len(centroids))
 
 
-
+    '''initialization 2 , in (1,1) randomly generate n+k Steiner points'''
     # initialization 2
     # in (1,1) randomly generate n+k Steiner points
 
@@ -209,12 +211,13 @@ if __name__ == '__main__':
             while check_inside(hard_corners, cur):
                 cur = (np.random.random(), np.random.random())
             points2.append(cur)
-        chromosomes.append(Chromosome(points2, ''.join(str(0) for _ in range(k)), terminals))
+        chromosomes.append(Chromosome(points2, ''.join(str(0) for _ in range(k)), terminals, all_obstacles))
     print(len(chromosomes))
 
 
     # initialization 3
     # randomly flip some of the genes in the second binary part of the chromosome (randomly generate 0 and 1)
     for i in range(50):
-        chromosomes.append(Chromosome([], ''.join(random.choice('01') for _ in range(k)), terminals))
+        chromosomes.append(Chromosome([], ''.join(random.choice('01') for _ in range(k)), terminals,all_obstacles))
     # print(len(chromosomes))
+    #Here we shall get 101 chromosomes
