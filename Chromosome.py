@@ -46,7 +46,7 @@ class Chromosome:
         cross_len = 0
         weight = 0
         for i in range(len(self.obstacles)):
-            cur_len = utils.segment_in_obstacle_length(self.obstacles[i].points, [point1, point2])
+            cur_len = utils.segment_in_obstacle_length(self.obstacles[i].points, (point1, point2))
             cross_len += cur_len
             weight += cur_len * self.obstacles[i].weight
         return weight + (org_len - cross_len)
@@ -79,6 +79,8 @@ class Chromosome:
 
     def get_obstacle_corners(self):
         obstacle_corners = []
+        if not self.obstacles:
+            return obstacle_corners
         for obstacle in self.obstacles:
             obstacle_corners.extend(obstacle.points)
         return obstacle_corners
@@ -93,21 +95,32 @@ class Chromosome:
         ymove = np.random.uniform(0, mrange)
         s = len(spts)
         k = len(bins)
-
+        #todo let's consider the negative direction
+        #todo let's assume there is no boundary
         probs = np.random.binomial(1, 1 / (s + k), s + k)
         for i in range(s):
             if probs[i] == 1:
                 loc = spts[i]
-                flagx = 1
-                flagy = 1
+                flagx_pos = 1
+                flagy_pos = 1
+                flagx_neg = -1
+                flagy_neg = -1
                 if loc[0] + xmove > 1:
-                    flagx = 0
+                    flagx_pos = 0
                 if loc[1] + ymove > 1:
-                    flagy = 0
-                spts[i] = (spts[i][0] + xmove * flagx, spts[i][1] + ymove * flagy)
-                # spts[i][0] += xmove * flagx
-                # spts[i][1] += ymove * flagy
-        # self.steinerpts = spts
+                    flagy_pos = 0
+                if loc[0] - xmove < 0:
+                    flagx_neg = 0
+                if loc[1] - ymove < 0:
+                    flagy_neg = 0
+                xdirs = [flagx_pos, flagx_neg]
+                ydirs = [flagy_pos, flagy_neg]
+                x_idx = utils.select_random_one_index(xdirs)
+                y_idx = utils.select_random_one_index(ydirs)
+                if x_idx == -1 and y_idx == -1:
+                    continue
+                spts[i] = (spts[i][0] + xmove * xdirs[x_idx], spts[i][1] + ymove * ydirs[y_idx])
+        #todo what if this move to a solid obstacle
         new_bins = ''
         for i in range(k):
             if probs[i + s] == 1:
@@ -206,11 +219,24 @@ class Chromosome:
         v1 = p2 - p1
         v2 = p3 - p1
 
+        # Avoid division by zero if vectors are zero vectors
+        if np.linalg.norm(v1) == 0 or np.linalg.norm(v2) == 0:
+            return 100  # p2 and p3 are the same point
+            # Calculate the cosine of the angle
+        cosine_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+        # Ensure the cosine value is within the range [-1, 1]
+        cosine_angle = np.clip(cosine_angle, -1, 1)
+
+        # Calculate angle using arccos
+        angle = np.arccos(cosine_angle)
+
         # Calculate angle using dot product
-        angle = np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+        #angle = np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
         return angle
 
     def calculate_steiner_point(self, nodes):
+        #todo what if the new point is in solid obstacle
         """Calculates the position of a new Steiner point."""
         # Here, we're just calculating the centroid of the triangle formed by the nodes.
         points = [np.array(self.nodes)[node] for node in nodes]
@@ -225,6 +251,45 @@ class Chromosome:
             cur = np.random.random(), np.random.random()
 
         return cur
+    def simpson_line(self):
+        hard_obstacles = [ob.points for ob in self.obstacles if
+                          ob.weight == sys.maxsize]
+        ret_chromosome = copy.deepcopy(self)
+
+        new_stpts = self.steinerpts
+        degrees = {node: 0 for node in range(len(self.steinerpts))}
+        for edge in self.mst:
+            if self.nodes[edge[0]] in self.steinerpts:
+                degrees[edge[0]] += 1
+            if self.nodes[edge[1]] in self.steinerpts:
+                degrees[edge[1]] += 1
+
+        degree_3_pts = [pt for pt, degree in degrees.items() if degree == 3]
+
+        # If there are no Steiner points with degree 2, return without doing anything
+        if not degree_3_pts:
+            print('No neighbours')
+            return ret_chromosome
+        for pt in degree_3_pts:
+            neighbours = []
+            for edge in self.mst:
+                if edge[0] == pt:
+                    neighbours.append(self.nodes[edge[1]])
+                elif edge[1] == pt:
+                    neighbours.append(self.nodes[edge[0]])
+            print('neighbours', neighbours)
+            new_pt = tuple(utils.fermat_torricelli_point(neighbours))
+            if not utils.check_inside(hard_obstacles, new_pt):
+                new_stpts.remove(self.nodes[pt])
+                new_stpts.append(new_pt)
+        ret_chromosome.steinerpts = new_stpts
+        return ret_chromosome
+
+
+
+
+
+
 
 
 # Example usage

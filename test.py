@@ -46,9 +46,13 @@ def main():
 
     # Create a Chromosome instance
     chromosome = create_chromosome(num_steiner=5, num_terminals=3, obstacles=obstacles)
+    new_chro = chromosome.simpson_line()
+    print(new_chro)
 
     # Test mutations on the chromosome
-    test_mutations(chromosome, num_iterations=3)
+    #test_mutations(chromosome, num_iterations=3)
+
+
 
 if __name__ == "__main__":
     main()
