@@ -187,13 +187,19 @@ class Chromosome:
 
     def remove_steiner_mutation(self):
         ret_chromosome = copy.deepcopy(self)
-        degrees = {node: 0 for node in range(len(self.steinerpts))}
+        degrees = {node: 0 for node in range(len(self.nodes))}
         for edge in self.mst:
+            if any(np.array_equal(self.nodes[edge[0]], pt) for pt in self.steinerpts):
+                degrees[edge[0]] += 1
+                # 检查edge[1]是否对应于steiner点
+            if any(np.array_equal(self.nodes[edge[1]], pt) for pt in self.steinerpts):
+                degrees[edge[1]] += 1
+            '''
             if self.nodes[edge[0]] in self.steinerpts:
                 degrees[edge[0]] += 1
             if self.nodes[edge[1]] in self.steinerpts:
                 degrees[edge[1]] += 1
-
+            '''
         degree_2_pts = [pt for pt, degree in degrees.items() if degree == 2]
 
         # If there are no Steiner points with degree 2, return without doing anything
@@ -204,8 +210,8 @@ class Chromosome:
         while idx >= len(self.steinerpts):
             idx = random.choice(degree_2_pts)
 
-        pt_to_remove = self.steinerpts[idx]  # random would generate  an index of steiner points
-        return Chromosome([pt for pt in self.steinerpts if pt != pt_to_remove], self.bins, self.terminals,
+        pt_to_remove = tuple(self.steinerpts[idx] ) # random would generate  an index of steiner points
+        return Chromosome([pt for pt in self.steinerpts if tuple(pt) != pt_to_remove], self.bins, self.terminals,
                           self.obstacles)
 
     def calculate_angle(self, node, neighbor1, neighbor2):

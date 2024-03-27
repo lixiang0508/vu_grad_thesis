@@ -11,23 +11,25 @@ from Obstacle import Obstacle
 from scipy.spatial import Delaunay
 import matplotlib.path as mpath
 
+
 def check_inside(vertices, point):
     for i in range(len(vertices)):
         # Define the vertices of the polygon
-        #vertices = np.array([[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]])
-        #polygon = mpath.Path(np.array(vertices[i]))
-        polygon = mpath.Path(vertices[i] + [vertices[i][0]]) #todo made some changes
+        # vertices = np.array([[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]])
+        # polygon = mpath.Path(np.array(vertices[i]))
+        polygon = mpath.Path(vertices[i] + [vertices[i][0]])  # todo made some changes
 
         # Point to be tested
-        #point = np.array([0.5, 0.5])
+        # point = np.array([0.5, 0.5])
 
         # Check if the point is inside the polygon
-        #inside = polygon.contains_point(np.array(point))
+        # inside = polygon.contains_point(np.array(point))
         inside = polygon.contains_point(point)
-        if inside==True:
+        if inside == True:
             return True
-    #print('Point inside polygon:', inside)
+    # print('Point inside polygon:', inside)
     return False
+
 
 def process_terminal_file(file_path):
     terminals = []
@@ -36,7 +38,7 @@ def process_terminal_file(file_path):
             line = line.strip()
             # print(line)
             columns = line.split(',')
-            if columns[0] != 'Xcoord' :
+            if columns[0] != 'Xcoord':
                 try:
                     # Convert the second and third column to float and add as a tuple to the list
                     x, y = float(columns[0]), float(columns[1])
@@ -46,14 +48,21 @@ def process_terminal_file(file_path):
                     continue
     return terminals
 
+    # Define a function to process the CSV file and extract obstacles and their coordinates
 
 
-                # Define a function to process the CSV file and extract obstacles and their coordinates
 def process_obstacle_file(file_path):
     obstacles = []
     current_obstacle = {}
 
     with open(file_path, 'r') as file:
+        first_char = file.read(1)
+        if not first_char:  # if the file is empty
+            print('empty file')
+            return obstacles
+        print('first_char', first_char, 'is it', len(first_char))
+        # if not empty back to the starting point
+        file.seek(0)
         blank_line_count = 0  # Counter for consecutive blank lines
         for line in file:
             line = line.strip()
@@ -61,7 +70,7 @@ def process_obstacle_file(file_path):
             parts = line.split(',')
             # print(parts)
             # Check for blank line
-            if len(parts[0]) == 0 and len(parts[1]) == 0:
+            if not line or len(parts[0]) == 0 and len(parts[1]) == 0:
                 blank_line_count += 1
                 if blank_line_count == 2:  # Two consecutive blank lines signal end of file content
                     break
@@ -92,9 +101,10 @@ def process_obstacle_file(file_path):
 def crossover(chromosome1, chromosome2):
     corners = []
     for obs in chromosome1.obstacles:
-        corners.extend(obs.points) # chromosome 1 and 2 have the same obstacles
+        corners.extend(obs.points)  # chromosome 1 and 2 have the same obstacles
     terminal_x = [x[0] for x in chromosome1.terminals]
     split = random.uniform(min(terminal_x), max(terminal_x))
+    # print("crossover, split at ",split)
     c1_stpts_l = []
     c1_stpts_r = []
     c2_stpts_l = []
@@ -118,7 +128,7 @@ def crossover(chromosome1, chromosome2):
         corner = corners[i]
         c1_bin = chromosome1.bins[i]
         c2_bin = chromosome2.bins[i]
-        if corner[0]<= split:
+        if corner[0] <= split:
             c1_corners_l += c1_bin
             c2_corners_l += c2_bin
         else:
@@ -131,13 +141,17 @@ def crossover(chromosome1, chromosome2):
     child1_bins = c1_corners_l + c2_corners_r
     child2_bins = c2_corners_l + c1_corners_r
 
-    return Chromosome(c1_stpts_l, child1_bins, chromosome1.terminals, chromosome1.obstacles) , Chromosome(c2_stpts_l ,child2_bins, chromosome1.terminals, chromosome1.obstacles)
+    return Chromosome(c1_stpts_l, child1_bins, chromosome1.terminals, chromosome1.obstacles), Chromosome(c2_stpts_l,
+                                                                                                         child2_bins,
+                                                                                                         chromosome1.terminals,
+                                                                                                         chromosome1.obstacles)
+
 
 def tournament(chromosomes, avg_dis_tmn, threshold, freq):
     '''threshold is a small number, it stands for the improvement ; freq is the number of times which improvement is lower
     than the threshold, when the times reach freq is it deemed as converge'''
     low_imp_times = 0
-    cur_opt =  min(chromosomes, key=lambda obj: obj.cost)
+    cur_opt = min(chromosomes, key=lambda obj: obj.cost)
     no_gen = 1  # number of generations
     pmax = 0.99
     pmin = 0.60
@@ -159,6 +173,10 @@ def tournament(chromosomes, avg_dis_tmn, threshold, freq):
 
             probs = [p_flipMove, p_add, p_remove]
             chosen_index = np.random.choice([0, 1, 2], p=probs)  # 0 1 2
+            if (len(offspring1.steinerpts) + len(offspring1.obstacles) == 0) or (
+                    len(offspring2.steinerpts) + len(offspring2.obstacles) == 0):
+                probs = [0.5, 0.5]
+                chosen_index = np.random.choice([1, 2], p=probs)
             if chosen_index == 0:
                 new_offspring1 = offspring1.flipMove(avg_dis_tmn, no_gen)
                 new_offspring2 = offspring2.flipMove(avg_dis_tmn, no_gen)
@@ -174,28 +192,27 @@ def tournament(chromosomes, avg_dis_tmn, threshold, freq):
                 new_offspring2 = offspring2.remove_steiner_mutation()
                 chromosomes.append(new_offspring1)
                 chromosomes.append(new_offspring2)
-        #At the end of each generation , discard the least fit 166 chromosomes
+        # At the end of each generation , discard the least fit 166 chromosomes
         chromosomes.sort(key=lambda x: x.cost, reverse=True)
         top_166_chromosomes = chromosomes[:166]
         for chromosome in top_166_chromosomes:
             chromosomes.remove(chromosome)
         temp_opt = min(chromosomes, key=lambda obj: obj.cost)
-        if cur_opt.cost - temp_opt.cost < threshold: # fail to improve more than threshold
-            low_imp_times +=1
+        if cur_opt.cost - temp_opt.cost < temp_opt.cost * threshold:  # fail to improve more than threshold
+            low_imp_times += 1
         else:
             low_imp_times = 0
 
-        cur_opt = temp_opt #update current optimal chromosome
+        cur_opt = temp_opt  # update current optimal chromosome
         if low_imp_times == freq:
-            print('after ', no_gen+1, ' tournaments it is converged and the cost is', cur_opt.cost)
+            print('after ', no_gen + 1, ' tournaments it is converged and the cost is', cur_opt.cost)
             return cur_opt
         no_gen += 1
-
-
+        print('generation ', no_gen, ' cost ', cur_opt.cost)
 
 
 def initial_tournament(chromosomes, avg_dis_tmn):
-    no_gen = 1 # number of generations
+    no_gen = 1  # number of generations
     pmax = 0.99
     pmin = 0.60
     # each time randomly select 5 of chromosomes from the list and pick the one with the lowest cost
@@ -208,14 +225,21 @@ def initial_tournament(chromosomes, avg_dis_tmn):
         offspring1, offspring2 = crossover(min_cost_chro_0, min_cost_chro_1)
         # crossover part is done
 
-        #mutation part
-        p_flipMove = max(pmax*(1 - no_gen/1000), pmin)
-        p_add = (1 - p_flipMove)/2
-        p_remove = (1 - p_flipMove)/2
+        # mutation part
+        p_flipMove = max(pmax * (1 - no_gen / 1000), pmin)
+        p_add = (1 - p_flipMove) / 2
+        p_remove = (1 - p_flipMove) / 2
 
         probs = [p_flipMove, p_add, p_remove]
-        chosen_index = np.random.choice([0, 1, 2], p=probs) # 0 1 2
-        if chosen_index == 0 :
+        chosen_index = np.random.choice([0, 1, 2], p=probs)  # 0 1 2
+        if (len(offspring1.steinerpts) + len(offspring1.obstacles) == 0) or (
+                len(offspring2.steinerpts) + len(offspring2.obstacles) == 0):
+            probs = [0.5, 0.5]
+            chosen_index = np.random.choice([1, 2], p=probs)
+        if chosen_index == 0:
+            # todo if we happen to have no obstacles, there must be some inti 3 instances (no steiner points)
+            # in this case we cannot flipMove
+
             new_offspring1 = offspring1.flipMove(avg_dis_tmn, no_gen)
             new_offspring2 = offspring2.flipMove(avg_dis_tmn, no_gen)
             chromosomes.append(new_offspring1)
@@ -231,11 +255,10 @@ def initial_tournament(chromosomes, avg_dis_tmn):
             chromosomes.append(new_offspring1)
             chromosomes.append(new_offspring2)
     no_gen += 1
-    chromosomes.pop() #delete the last added chromosome
+    chromosomes.pop()  # delete the last added chromosome
 
 
 def main_function(obstacle_path, terminal_path):
-
     chromosomes = []
     # Process the file and print the results
     obstacles = process_obstacle_file(obstacle_path)
@@ -245,7 +268,7 @@ def main_function(obstacle_path, terminal_path):
     for obstacle in obstacles:
         # print(
         # f"Obstacle Weight: {obstacle['weight']}, Coordinates: {obstacle['coordinates']}, len:{len(obstacle['coordinates'])}")
-        if obstacle['weight'] == sys.maxsize:
+        if obstacle['weight'] == float(sys.maxsize):
             hardobs.append(Obstacle(obstacle['weight'], 'hard', obstacle['coordinates']))
 
         else:
@@ -320,7 +343,7 @@ def main_function(obstacle_path, terminal_path):
     print('the intial average cost is', sum([ch.cost for ch in chromosomes]) / 500)
     # print(chromosomes[-1].cost)
     '''The initialization is done'''
-    opt_chro = tournament(chromosomes, avg_dis, 0.0001, 3)
+    opt_chro = tournament(chromosomes, avg_dis, 0.001, 500)
 
     '''What ever selection, mutation'''
 
@@ -329,15 +352,22 @@ def main_function(obstacle_path, terminal_path):
         print('The real optimal value is ', alter_opt_chro.cost)
     return min(alter_opt_chro.cost, opt_chro.cost)
 
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    results =[]
-    obstacle_path = 'SoftObstacles/obstacles2.csv'
-    terminal_path = 'soft_terminals/terminals2.csv'
-    for i in range(10):
-        results.append(main_function(obstacle_path,terminal_path))
+    results = {}
+    for i in range(31, 34):
+        obstacle_path = 'SoftObstacles/obstacles' + str(i) + '.csv'
+        terminal_path = 'soft_terminals/terminals' + str(i) + '.csv'
+        # for i in range(10):
+        obs = 'soft_obs_' + str(i)
+        results[obs] = main_function(obstacle_path, terminal_path)
+        print(obstacle_path, ' ', results[obs])
+        with open('output.txt', 'a') as file:
+            # 将浮点数转换为字符串并写入文件
+
+            file.write(obstacle_path + ' ' + str(results[obs]) + " \n")
 
     print(results)
 
-    #The last step is simpson_line()
-
+    # The last step is simpson_line()
