@@ -1,4 +1,5 @@
 import random
+import sys
 
 import numpy as np
 import matplotlib.path as mpath
@@ -141,3 +142,15 @@ def select_random_one_index(arr):
     # Randomly select and return one of these indices
     return random.choice(indices_of_ones) if indices_of_ones else None
 
+def print_out(chromosome):
+    all_obs = chromosome.obstacles
+    soft_obstacles = [ob for ob in all_obs if ob['weight']<sys.maxsize]
+    solid_obstacles = [ob for ob in all_obs if ob['weight']==sys.maxsize]
+    print('The soft obstacles are',soft_obstacles)
+    print('The solid obstacles are', soft_obstacles)
+    print('The steiner points are', chromosome.steinerpts)
+    print('The terminals are', chromosome.terminals)
+    edges = []
+    for i in range(len(chromosome.mst)):
+        edges.append((chromosome.nodes[chromosome.mst[i][0]], chromosome.nodes[chromosome.mst[i][1]]))
+    print('The steiner edges are ', edges)

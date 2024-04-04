@@ -139,21 +139,6 @@ class Chromosome:
         # ret_chromosome.cost = self.cost
         return ret_chromosome
 
-    """def calculate_mst(self):
-        #Calculates the Weighted Minimum Spanning Tree for the chromosome.
-        ret_chromosome = Chromosome(self.steinerpts, self.bins, self.terminals, self.obstacles)
-
-        ret_chromosome.steinerpts = self.steinerpts
-        all_points = self.steinerpts
-        dist_matrix = distance_matrix(all_points, all_points)
-        mst = minimum_spanning_tree(dist_matrix).toarray()
-
-        # Update the edges based on MST calculation
-        self.edges = np.argwhere(mst > 0)
-        ret_chromosome.edges = self.edges
-        ret_chromosome.cost = self.cost
-        return ret_chromosome
-    """
 
     def add_steiner_mutation(self):
         hard_obstacles = [ob.points for ob in self.obstacles if
@@ -191,7 +176,7 @@ class Chromosome:
         for edge in self.mst:
             if any(np.array_equal(self.nodes[edge[0]], pt) for pt in self.steinerpts):
                 degrees[edge[0]] += 1
-                # 检查edge[1]是否对应于steiner点
+
             if any(np.array_equal(self.nodes[edge[1]], pt) for pt in self.steinerpts):
                 degrees[edge[1]] += 1
             '''

@@ -356,9 +356,9 @@ def main_function(obstacle_path, terminal_path):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     results = {}
-    for i in range(31, 34):
-        obstacle_path = 'SoftObstacles/obstacles' + str(i) + '.csv'
-        terminal_path = 'soft_terminals/terminals' + str(i) + '.csv'
+    for i in range(10, 23):
+        obstacle_path = 'SolidObstacles/obstacles' + str(i) + '.csv'
+        terminal_path = 'solid_terminals/terminals' + str(i) + '.csv'
         # for i in range(10):
         obs = 'soft_obs_' + str(i)
         results[obs] = main_function(obstacle_path, terminal_path)
