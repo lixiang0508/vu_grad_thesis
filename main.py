@@ -1,5 +1,6 @@
 # This is a sample Python script.
 import csv
+import math
 import sys
 import random
 import utils
@@ -9,6 +10,7 @@ import numpy as np
 from Chromosome import Chromosome
 from Obstacle import Obstacle
 from scipy.spatial import Delaunay
+from visualization import vis
 import matplotlib.path as mpath
 
 
@@ -60,7 +62,7 @@ def process_obstacle_file(file_path):
         if not first_char:  # if the file is empty
             print('empty file')
             return obstacles
-        print('first_char', first_char, 'is it', len(first_char))
+        #print('first_char', first_char, 'is it', len(first_char))
         # if not empty back to the starting point
         file.seek(0)
         blank_line_count = 0  # Counter for consecutive blank lines
@@ -79,7 +81,7 @@ def process_obstacle_file(file_path):
                 blank_line_count = 0  # Reset counter if line is not blank
 
             parts = line.split(',')
-            print(parts)
+            #print(parts)
             if len(parts[0]) != 0 and len(parts[1]) == 0:  # New obstacle detected
                 if current_obstacle:  # Save the previous obstacle if it exists
                     obstacles.append(current_obstacle)
@@ -208,7 +210,8 @@ def tournament(chromosomes, avg_dis_tmn, threshold, freq):
             print('after ', no_gen + 1, ' tournaments it is converged and the cost is', cur_opt.cost)
             return cur_opt
         no_gen += 1
-        print('generation ', no_gen, ' cost ', cur_opt.cost)
+        if no_gen % 50 == 0:
+            print('generation ', no_gen, ' cost ', cur_opt.cost)
 
 
 def initial_tournament(chromosomes, avg_dis_tmn):
@@ -256,6 +259,108 @@ def initial_tournament(chromosomes, avg_dis_tmn):
             chromosomes.append(new_offspring2)
     no_gen += 1
     chromosomes.pop()  # delete the last added chromosome
+def visualize(obstacle_path, terminal_path):
+    chromosomes = []
+    # Process the file and print the results
+    obstacles = process_obstacle_file(obstacle_path)
+    print('obstacles,', obstacles)
+    softobs = []
+    hardobs = []
+    for obstacle in obstacles:
+        # print(
+        # f"Obstacle Weight: {obstacle['weight']}, Coordinates: {obstacle['coordinates']}, len:{len(obstacle['coordinates'])}")
+        if obstacle['weight'] == float(sys.maxsize):
+            hardobs.append(Obstacle(obstacle['weight'], 'hard', obstacle['coordinates']))
+
+        else:
+            softobs.append(Obstacle(obstacle['weight'], 'soft', obstacle['coordinates']))
+
+    all_obstacles = []
+    all_obstacles.extend(softobs)
+    all_obstacles.extend(hardobs)
+    # print('all_obstacles', all_obstacles)
+
+    # if any terminal in soft or hard obstacle then regenerate one
+    terminals = process_terminal_file(terminal_path)
+    # print('terminals ', terminals)
+    hard_corners = []
+    for i in range(len(hardobs)):
+        curob = hardobs[i]
+        hard_corners.append(curob.points)
+    # hard_corners = [ob['coordinates'] for ob in softobs]
+    print('hard_corners', hard_corners)
+
+    # print(terminals)
+    dis = []
+    n = len(terminals)
+    for i in range(n):
+        for j in range(i + 1, n):
+            dis.append(utils.cal_dis(terminals[i], terminals[j]))
+    avg_dis = sum(dis) / len(dis)
+    print(' average distance of terminals is', avg_dis)
+    k = sum(len(o['coordinates']) for o in obstacles)
+
+    ''' initialization 1 Delaunay triangulation '''
+    term_corners = []
+    corners = []
+    for o in obstacles:
+        term_corners.extend(o['coordinates'])
+        corners.extend(o['coordinates'])
+    term_corners.extend(terminals)
+    np_term_corners = np.array(term_corners)
+    tri = Delaunay(term_corners)
+    # Find centroids
+    centroids = [np_term_corners[triangle].mean(axis=0) for triangle in tri.simplices]
+    centroids = [cent for cent in centroids if not check_inside(hard_corners, cent)]
+
+
+    # Print centroids
+    # print('initialization 1 centroids' , np.array(centroids))
+
+    # print('intialization 1 obstacles', all_obstacles)
+    chromosomes.append(Chromosome(centroids, ''.join(str(0) for _ in range(k)), terminals, all_obstacles))
+    print('init 1 ')
+    for j in range(50):
+        points2 = []
+        for i in range(n + k):
+            cur = (np.random.random(), np.random.random())
+            while check_inside(hard_corners, cur):
+                cur = (np.random.random(), np.random.random())
+            points2.append(cur)
+        chromosomes.append(Chromosome(points2, ''.join(str(0) for _ in range(k)), terminals, all_obstacles))
+    print('After init 2 we have how many chromosomes ', len(chromosomes))
+    for i in range(50):
+        chromosomes.append(Chromosome([], ''.join(random.choice('01') for _ in range(k)), terminals, all_obstacles))
+    print('After init 3 we have how many chromosomes ', len(chromosomes))
+    initial_tournament(chromosomes, avg_dis)
+    print('After full initialization we have how many chromosomes ', len(chromosomes))
+    print('the intial average cost is', sum([ch.cost for ch in chromosomes]) / 500)
+    print('the minimum cost is ', min([ch.cost for ch in chromosomes]))
+    # print(chromosomes[-1].cost)
+    '''The initialization is done'''
+    opt_chro = tournament(chromosomes, avg_dis, 0.001, 500)
+
+    '''What ever selection, mutation'''
+
+    alter_opt_chro = opt_chro.simpson_line()
+    # todo let's visualize it here
+    if alter_opt_chro.cost < opt_chro.cost:
+        print('The real optimal value is ', alter_opt_chro.cost)
+        outer_vis(alter_opt_chro, softobs, hardobs, obstacle_path[22:26] + 'png')
+        print('nodes',alter_opt_chro.get_nodes())
+        print('steiner points', alter_opt_chro.steinerpts)
+        print('mst',alter_opt_chro.mst)
+        print('bins',alter_opt_chro.bins)
+        opt_chro = alter_opt_chro
+
+    else:
+        outer_vis(opt_chro, softobs, hardobs, obstacle_path[22:26] + 'png')
+        print('nodes', opt_chro.get_nodes())
+        print('steiner points', opt_chro.steinerpts)
+        print('mst', opt_chro.mst)
+        print('bins', opt_chro.bins)
+    return opt_chro
+
 
 
 def main_function(obstacle_path, terminal_path):
@@ -312,11 +417,20 @@ def main_function(obstacle_path, terminal_path):
     centroids = [np_term_corners[triangle].mean(axis=0) for triangle in tri.simplices]
     centroids = [cent for cent in centroids if not check_inside(hard_corners, cent)]
 
+
+
+
+
+
     # Print centroids
     # print('initialization 1 centroids' , np.array(centroids))
 
     # print('intialization 1 obstacles', all_obstacles)
     chromosomes.append(Chromosome(centroids, ''.join(str(0) for _ in range(k)), terminals, all_obstacles))
+    # todo let's visualize it here
+
+
+
     # print(len(centroids))
 
     '''initialization 2 , in (1,1) randomly generate n+k Steiner points'''
@@ -341,6 +455,7 @@ def main_function(obstacle_path, terminal_path):
     initial_tournament(chromosomes, avg_dis)
     print('After full initialization we have how many chromosomes ', len(chromosomes))
     print('the intial average cost is', sum([ch.cost for ch in chromosomes]) / 500)
+    print('the minimum cost is ', min([ch.cost for ch in chromosomes]))
     # print(chromosomes[-1].cost)
     '''The initialization is done'''
     opt_chro = tournament(chromosomes, avg_dis, 0.001, 500)
@@ -349,24 +464,52 @@ def main_function(obstacle_path, terminal_path):
 
     alter_opt_chro = opt_chro.simpson_line()
     if alter_opt_chro.cost < opt_chro.cost:
+        opt_chro = alter_opt_chro
         print('The real optimal value is ', alter_opt_chro.cost)
-    return min(alter_opt_chro.cost, opt_chro.cost)
+    return opt_chro
+def outer_vis(c,softobs,hardobs,path):
 
+    all_corners = c.get_obstacle_corners()
+    corners = []
+    for i in range(len(c.bins)):
+        if c.bins[i] == '1':
+            corners.append(all_corners[i])
+    nodes = c.get_nodes()
+   # print('nodes',nodes)
+    mst = c.mst
+   # print('mst：', mst)
+    mst_edges = []
+    for edge in mst:
+        mst_edges.append((nodes[edge[0]], nodes[edge[1]]))
+
+    vis(c.terminals, c.steinerpts, corners, softobs, hardobs, mst_edges,path)
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+    '''
+    for i in range(2, 3):
+        obstacle_path = 'SoftObstacles/obstacles' + str(i) + '.csv'
+        terminal_path = 'soft_terminals/terminals' + str(i) + '.csv'
+        # for i in range(10):
+        obs = 'soft_obs_' + str(i)
+        visualize(obstacle_path, terminal_path)
+
+
+    '''
     results = {}
-    for i in range(10, 23):
+    for i in range(3, 23):
         obstacle_path = 'SolidObstacles/obstacles' + str(i) + '.csv'
         terminal_path = 'solid_terminals/terminals' + str(i) + '.csv'
         # for i in range(10):
         obs = 'soft_obs_' + str(i)
-        results[obs] = main_function(obstacle_path, terminal_path)
+        chro = visualize(obstacle_path, terminal_path)
+        results[obs] = chro.cost
         print(obstacle_path, ' ', results[obs])
-        with open('output.txt', 'a') as file:
+        with open('output1.txt', 'a') as file:
             # 将浮点数转换为字符串并写入文件
 
-            file.write(obstacle_path + ' ' + str(results[obs]) + " \n")
+            file.write(obstacle_path + ' ' + str(results[obs]) + 'how many steinerpts '+ str(len(chro.steinerpts))
+                       +"how many corners"+ str(len(chro.nodes) - len(chro.steinerpts) - len(chro.terminals))+" \n")
 
     print(results)
 

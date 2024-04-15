@@ -4,6 +4,8 @@ import sys
 import numpy as np
 import matplotlib.path as mpath
 
+def round_point(point, precision=6):
+    return (round(point[0], precision), round(point[1], precision))
 
 
 def check_inside(vertices, point):
@@ -49,7 +51,7 @@ def line_intersection(p1, p2, p3, p4):
     y = det(d, ydiff) / div
     return x, y
 
-
+'''
 def point_inside_polygon(point, polygon):
     # A point is inside a polygon if a horizontal ray to the right intersects the polygon an odd number of times
     # Simple ray-casting algorithm
@@ -63,7 +65,40 @@ def point_inside_polygon(point, polygon):
                  polygon[i][0]):
             odd_intersects = not odd_intersects
     return odd_intersects
+'''
+def point_on_line(px, py, x1, y1, x2, y2, epsilon=1e-10):
+    if x1 == x2:  # 垂直线段
+        return min(y1, y2) <= py <= max(y1, y2) and abs(px - x1) <= epsilon
+    if y1 == y2:  # 水平线段
+        return min(x1, x2) <= px <= max(x1, x2) and abs(py - y1) <= epsilon
+    # 一般线段
+    return abs((py - y1) * (x2 - x1) - (y2 - y1) * (px - x1)) <= epsilon and min(x1, x2) <= px <= max(x1, x2) and min(y1, y2) <= py <= max(y1, y2)
 
+def point_inside_polygon(point, polygon):
+    x, y = point
+    odd_intersects = False
+    n = len(polygon)
+    for i in range(n):
+        j = (i + 1) % n
+        x1, y1 = polygon[i]
+        if x1 == x and y1==y :
+          return True
+        x2, y2 = polygon[j]
+
+        if point_on_line(x, y, x1, y1, x2, y2):
+            return True  # 点在边界上，直接返回True
+
+        # 将顶点按照y坐标排序
+        if y1 > y2:
+            x1, y1, x2, y2 = x2, y2, x1, y1
+
+        # 检查射线是否与多边形的一个边相交
+        if (y1 <= y < y2):
+            crossX = (y - y1) * (x2 - x1) / (y2 - y1) + x1
+            if x < crossX:
+                odd_intersects = not odd_intersects
+
+    return odd_intersects
 
 def is_line_segment_inside_polygon(polygon_vertices, line_segment):
     """
@@ -89,25 +124,21 @@ def segment_in_obstacle_length(obstacle, segment):
         if intersect(obstacle[i], obstacle[next_i], segment[0], segment[1]):
             point = line_intersection(obstacle[i], obstacle[next_i], segment[0], segment[1])
             if point:
-                intersections.append(tuple(point))
-    # Check if segment start/end points are inside the obstacle, and add them to intersections if so
-    if point_inside_polygon(segment[0], obstacle):
-        intersections.append(tuple(segment[0]))
-    if point_inside_polygon(segment[1], obstacle):
-        intersections.append(tuple(segment[1]))
+                intersections.append(round_point(tuple(point)))
 
-    # Remove duplicates and sort by distance from the segment's start
-    intersections = list(set(intersections))
+    if point_inside_polygon(segment[0], obstacle):
+        intersections.append(round_point(tuple(segment[0])))
+    if point_inside_polygon(segment[1], obstacle):
+        intersections.append(round_point(tuple(segment[1])))
+
+    intersections = list(set(intersections))  # Remove duplicates
     intersections.sort(key=lambda x: ((x[0] - segment[0][0]) ** 2 + (x[1] - segment[0][1]) ** 2))
 
-    # Calculate the length of the segment inside the obstacle
     length = 0
-    for i in range(1, len(intersections), 2):
-        inside = is_line_segment_inside_polygon(obstacle, [intersections[i],intersections[i-1]])
-        if i < len(intersections) and inside:
-            length += cal_dis(intersections[i],intersections[i-1])
-            #length += ((intersections[i][0] - intersections[i - 1][0]) ** 2 + (
-            #            intersections[i][1] - intersections[i - 1][1]) ** 2) ** 0.5
+    for i in range(1, len(intersections)):
+        inside = is_line_segment_inside_polygon(obstacle, [intersections[i], intersections[i - 1]])
+        if inside:
+            length += cal_dis(intersections[i], intersections[i - 1])
 
     return length
 

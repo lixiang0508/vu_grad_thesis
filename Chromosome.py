@@ -59,6 +59,7 @@ class Chromosome:
         # PriorityQueue used to choose the next edge with minimum weight
         edges = [(self.cal_edge_weight(nodes[0], nodes[i]), 0, i) for i in range(1, num_nodes)]
         heapq.heapify(edges)
+        weight_cache = {}
 
         mst = []  # store the edges of MST
         total_weight = 0
@@ -72,7 +73,11 @@ class Chromosome:
 
                 for next_v in range(num_nodes):
                     if not visited[next_v]:
-                        next_weight = self.cal_edge_weight(nodes[v], nodes[next_v])
+                        if (v, next_v) not in weight_cache:
+                            # 计算一次并缓存
+                            weight_cache[(v, next_v)] = weight_cache[(next_v, v)] = self.cal_edge_weight(nodes[v],nodes[next_v])
+                        next_weight = weight_cache[(v, next_v)]
+                        #next_weight = self.cal_edge_weight(nodes[v], nodes[next_v])
                         heapq.heappush(edges, (next_weight, v, next_v))
 
         return mst, total_weight
@@ -137,6 +142,8 @@ class Chromosome:
         # ret_chromosome = Chromosome(spts, bins, self.terminals, self.obstacles)
         # ret_chromosome.edges = self.edges
         # ret_chromosome.cost = self.cost
+        ret_chromosome.mst, ret_chromosome.cost = ret_chromosome.cal_mst()
+        ret_chromosome.nodes = ret_chromosome.get_nodes()
         return ret_chromosome
 
 
@@ -168,6 +175,8 @@ class Chromosome:
             # Add a random Steiner point if no small angle found
             random_point = self.generate_random_steiner_point(hard_obstacles)
             new_chro.steinerpts.append(random_point)
+        new_chro.mst, new_chro.cost = new_chro.cal_mst()
+        new_chro.nodes = new_chro.get_nodes()
         return new_chro
 
     def remove_steiner_mutation(self):
@@ -274,6 +283,8 @@ class Chromosome:
                 new_stpts.remove(self.nodes[pt])
                 new_stpts.append(new_pt)
         ret_chromosome.steinerpts = new_stpts
+        ret_chromosome.mst, ret_chromosome.cost = ret_chromosome.cal_mst()
+        ret_chromosome.nodes = ret_chromosome.get_nodes()
         return ret_chromosome
 
 
