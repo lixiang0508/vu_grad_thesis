@@ -208,10 +208,11 @@ def tournament(chromosomes, avg_dis_tmn, threshold, freq):
         cur_opt = temp_opt  # update current optimal chromosome
         if low_imp_times == freq:
             print('after ', no_gen + 1, ' tournaments it is converged and the cost is', cur_opt.cost)
-            return cur_opt
+            return cur_opt, no_gen
         no_gen += 1
-        if no_gen % 50 == 0:
-            print('generation ', no_gen, ' cost ', cur_opt.cost)
+        #if no_gen % 50 == 0 or no_gen ==1:
+        #todo unindent
+        print('generation ', no_gen, ' cost ', cur_opt.cost)
 
 
 def initial_tournament(chromosomes, avg_dis_tmn):
@@ -338,7 +339,7 @@ def visualize(obstacle_path, terminal_path):
     print('the minimum cost is ', min([ch.cost for ch in chromosomes]))
     # print(chromosomes[-1].cost)
     '''The initialization is done'''
-    opt_chro = tournament(chromosomes, avg_dis, 0.001, 500)
+    opt_chro, no_gen = tournament(chromosomes, avg_dis, 0.001, 500)
 
     '''What ever selection, mutation'''
 
@@ -359,7 +360,7 @@ def visualize(obstacle_path, terminal_path):
         print('steiner points', opt_chro.steinerpts)
         print('mst', opt_chro.mst)
         print('bins', opt_chro.bins)
-    return opt_chro
+    return opt_chro,no_gen
 
 
 
@@ -458,7 +459,7 @@ def main_function(obstacle_path, terminal_path):
     print('the minimum cost is ', min([ch.cost for ch in chromosomes]))
     # print(chromosomes[-1].cost)
     '''The initialization is done'''
-    opt_chro = tournament(chromosomes, avg_dis, 0.001, 500)
+    opt_chro, no_gen = tournament(chromosomes, avg_dis, 0.001, 500)
 
     '''What ever selection, mutation'''
 
@@ -466,7 +467,7 @@ def main_function(obstacle_path, terminal_path):
     if alter_opt_chro.cost < opt_chro.cost:
         opt_chro = alter_opt_chro
         print('The real optimal value is ', alter_opt_chro.cost)
-    return opt_chro
+    return opt_chro,no_gen
 def outer_vis(c,softobs,hardobs,path):
 
     all_corners = c.get_obstacle_corners()
@@ -497,20 +498,20 @@ if __name__ == '__main__':
 
     '''
     results = {}
-    for i in range(3, 23):
-        obstacle_path = 'SolidObstacles/obstacles' + str(i) + '.csv'
-        terminal_path = 'solid_terminals/terminals' + str(i) + '.csv'
+
+    for i in range(90, 100,10):
+        obstacle_path = 'SoftObstacles/sizing_obstacles/obstacles' + str(i) + '.csv'
+        terminal_path = 'soft_terminals/sizing_terminals/terminals' + str(i) + '.csv'
         # for i in range(10):
         obs = 'soft_obs_' + str(i)
-        chro = visualize(obstacle_path, terminal_path)
+        chro,no_gen = visualize(obstacle_path, terminal_path)
         results[obs] = chro.cost
         print(obstacle_path, ' ', results[obs])
         with open('output1.txt', 'a') as file:
             # 将浮点数转换为字符串并写入文件
 
-            file.write(obstacle_path + ' ' + str(results[obs]) + 'how many steinerpts '+ str(len(chro.steinerpts))
-                       +"how many corners"+ str(len(chro.nodes) - len(chro.steinerpts) - len(chro.terminals))+" \n")
+            file.write(obstacle_path + ' ' + str(results[obs]) + 'how many steinerpts  '+ str(len(chro.steinerpts))
+                       +"how many corners "+ str(len(chro.nodes) - len(chro.steinerpts) - len(chro.terminals))+"iters "+str(no_gen)+" \n")
 
     print(results)
 
-    # The last step is simpson_line()

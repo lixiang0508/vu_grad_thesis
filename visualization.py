@@ -26,28 +26,28 @@ hard_obstacles = [
 mst_edges = [((0.55, 0.55), (0.6, 0.5)), ((0.6, 0.5), (0.65, 0.65))]  # Example edges of the MST
 
 
-def vis(terminals, steinerpts, corners, soft_obstacles, hard_obstacles, mst_edges, path):
+def vis(terminals, steiner_points, corners, soft_obstacles, hard_obstacles, steiner_tree_edges, path):
     # Now let's modify the plot code to handle these objects
+    '''
     fig, ax = plt.subplots(figsize=(15, 15))
 
     # Plot soft obstacles
-    for obstacle in soft_obstacles:
-        create_polygon(obstacle.points, 'lightgreen', ax)
+    for polygon_coords in soft_obstacles:
+        create_polygon(polygon_coords, 'lightgreen', ax)
 
     # Plot hard obstacles
-    for obstacle in hard_obstacles:
-        create_polygon(obstacle.points, 'orange', ax)
+    for polygon_coords in hard_obstacles:
+        create_polygon(polygon_coords, 'orange', ax)
 
     # Plot terminals
-    terminal_plot = ax.plot(*zip(*terminals), 'o', color='red', label='Terminals')[0]
+    terminal_plot = ax.plot(*zip(*terminals), 'o', color='red', label='Terminals', markersize=12)[0]
 
     # Plot Steiner points
-    steiner_point_plot = ax.plot(*zip(*steinerpts), 'o', color='blue', label='Steiner Points')[0]
-
-    corners_plot = ax.plot(*zip(*corners), 'o', color='black', label='Obstacle Corners')[0]
+    steiner_point_plot = ax.plot(*zip(*steiner_points), 'o', color='blue', label='Steiner Points', markersize=12)[0]
+    corners_plot = ax.plot(*zip(*corners), 'o', color='black', label='Obstacle Corners', markersize=12)[0]
 
     # Plot Steiner tree edges
-    for edge in mst_edges:
+    for edge in steiner_tree_edges:
         line = Line2D([edge[0][0], edge[1][0]], [edge[0][1], edge[1][1]], color='black')
         ax.add_line(line)
 
@@ -56,17 +56,26 @@ def vis(terminals, steinerpts, corners, soft_obstacles, hard_obstacles, mst_edge
                                   markerfacecolor='lightgreen', markersize=15)
     hard_obstacle_legend = Line2D([0], [0], marker='o', color='w', label='Hard Obstacle',
                                   markerfacecolor='orange', markersize=15)
-    steiner_edge_legend = Line2D([0], [0], color='black', lw=2, label='MST')
+    terminal_plot_legend = Line2D([0], [0], marker='o', color='w', label='Terminal',
+                                  markerfacecolor='red', markersize=15)
+    steiner_point_plot_legend = Line2D([0], [0], marker='o', color='w', label='Steiner point',
+                                       markerfacecolor='blue', markersize=15)
+    corners_plot_legend = Line2D([0], [0], marker='o', color='w', label='Obstacle corner',
+                                 markerfacecolor='black', markersize=15)
+    steiner_edge_legend = Line2D([0], [0], color='black', lw=2, label='Steiner Tree Edge')
 
     # Add legends
-    ax.legend(handles=[soft_obstacle_legend, hard_obstacle_legend, terminal_plot, corners_plot, steiner_point_plot,
-                       steiner_edge_legend], loc='lower right', bbox_to_anchor=(1, 1))
+    ax.legend(handles=[soft_obstacle_legend, hard_obstacle_legend, terminal_plot_legend, steiner_point_plot_legend,
+                       corners_plot_legend, steiner_edge_legend], loc='lower right',
+              prop={'size': 18, 'weight': 'bold'},
+              bbox_to_anchor=(1, 1))
 
     # Set the plot boundaries
+
     # ax.set_xlim(0, 1)
     # ax.set_ylim(0, 1)
-
     # Show the plot with a legend
-
-    plt.xlabel(path)
+    plt.xlabel('GA '+path)
     plt.show()
+    '''
+    print('plot')

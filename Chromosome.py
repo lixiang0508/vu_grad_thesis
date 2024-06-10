@@ -197,7 +197,7 @@ class Chromosome:
         degree_2_pts = [pt for pt, degree in degrees.items() if degree == 2]
 
         # If there are no Steiner points with degree 2, return without doing anything
-        if not degree_2_pts:
+        if not degree_2_pts or len(self.steinerpts)==0:
             return ret_chromosome
 
         idx = random.choice(degree_2_pts)
